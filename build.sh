@@ -20,7 +20,7 @@ main() {
 	if [[ -d "$CGLM_DIR" ]]; then
 		echo "!! cglm directory already exists !!"
 		echo "reinstall?"
-		read -p "y/n" shouldDelete
+		read -rn 1 -p "y/n" shouldDelete
 
 		if [[ "$shouldDelete" == "y" ]]; then
 			sudo rm -rdf "$CGLM_DIR"
@@ -35,7 +35,7 @@ main() {
 	if [[ -d "$STB_IMAGE_DIR" ]]; then
 		echo "!! stb_image directory already exists !!"
 		echo "reinstall?"
-		read -p "y/n" shouldDelete
+		read -rn 1 -p "y/n" shouldDelete
 
 		if [[ "$shouldDelete" == "y" ]]; then
 			sudo rm -rdf "$STB_IMAGE_DIR"

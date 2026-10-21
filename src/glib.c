@@ -2,6 +2,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -150,102 +151,55 @@ void freeShader(const char *shaderSource, uint shader) {
 
 // RENDER_C
 
-void renderScene(struct Scene *scene, struct Window *window) {
-	glm_mat4_identity(scene->view);
-	glm_mat4_identity(scene->projection);
+void setProjectionMat(mat4 projection, float fov, float aspectRatio, float nearPlane, float farPlane) {
+	glm_mat4_identity(projection);
 
-	glm_vec3_add(scene->camera->position, scene->camera->front, scene->camera->target);
-	glm_lookat(scene->camera->position, scene->camera->target, scene->camera->up, scene->view);
-
-	glm_perspective(glm_rad(scene->camera->fov), window->width/window->height, scene->camera->nearPlane, scene->camera->farPlane, scene->projection);
-
-	for (uint i = 0; i < scene->modelCount; i++)
-		renderModel(&scene->models[i], scene->view, scene->projection);
+	glm_perspective(fov, aspectRatio, nearPlane, farPlane, projection);
 }
 
-void renderModel(struct Model *model, mat4 viewMat, mat4 projectionMat) {
-	glUseProgram(model->shader);
+void setViewMat(mat4 view, vec3 position, vec3 front, vec3 target, vec3 up) {
+	glm_mat4_identity(view);
 
-	shaderSetMat4(model->shader, "view", GL_FALSE, viewMat);
-	shaderSetMat4(model->shader, "projection", GL_FALSE, projectionMat);
-
-	glBindVertexArray(model->VAO);
-
-	for (uint i = 0; i < model->instanceCount; i++)
-		renderModelInstance(&model->instances[i], model->shader, model->indiceCount);
-
-	glBindVertexArray(0);
+	glm_vec3_add(position, front, target);
+	glm_lookat(position, target, up, view);
 }
 
-void renderModelInstance(struct ModelInstance *instance, uint shaderProgram, uint indiceCount) {
-	glm_mat4_identity(instance->model);
+void setModelMat(mat4 model, vec3 position, vec3 rotation, vec3 scale, float rotationScale) {
+	glm_mat4_identity(model);
 
-	glm_translate(instance->model, instance->position);
-	glm_rotate(instance->model, instance->rotationScale, instance->rotation);
-	glm_scale(instance->model, instance->scale);
-		
-	shaderSetMat4(shaderProgram, "model", GL_FALSE, instance->model);
-
-	glDrawElements(GL_TRIANGLES, indiceCount, GL_UNSIGNED_INT, 0);
+	glm_translate(model, position);
+	glm_rotate(model, rotationScale, rotation);
+	glm_scale(model, scale);
 }
 
 // MODEL_C
 
-void initScene(struct Scene *scene, int modelCount) {
-	scene->modelCount = modelCount;
-	scene->models = malloc(sizeof(struct Model) * scene->modelCount);
-}
 
-void initModel(struct Model *model, int instanceCount) {
-	generateModelArrays(model);
+void generateModelArrays(uint *VAO, uint *VBO, uint *EBO, uint vCount, uint iCount, struct Vertex *verticies, uint *indices) {
+	glGenVertexArrays(1, VAO);
+	glGenBuffers(1, VBO);
+	glGenBuffers(1, EBO);
 
-	model->instanceCount = instanceCount;
-	model->instances = malloc(sizeof(struct ModelInstance) * model->instanceCount);
-}
+	glBindVertexArray(*VAO);
 
-void initInstance(struct ModelInstance *instance, vec3 position, vec3 rotation, vec3 scale, float rotationScale) {
-	if (position)
-		glm_vec3_copy(position, instance->position);
-	else
-		glm_vec3_zero(instance->position);
+	glBindBuffer(GL_ARRAY_BUFFER, *VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(struct Vertex) * vCount, &verticies[0], GL_STATIC_DRAW);
 
-	if (rotation)
-		glm_vec3_copy(rotation, instance->rotation);
-	else
-		glm_vec3_zero(instance->rotation);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint) * iCount, indices, GL_STATIC_DRAW);
 
-	if (scale)
-		glm_vec3_copy(scale, instance->scale);
-	else
-		glm_vec3_zero(instance->scale);
-
-	instance->rotationScale = rotationScale;
-}
-
-void generateModelArrays(struct Model *model) {
-	glGenVertexArrays(1, &model->VAO);
-	glGenBuffers(1, &model->VBO);
-	glGenBuffers(1, &model->EBO);
-
-	glBindVertexArray(model->VAO);
-
-	glBindBuffer(GL_ARRAY_BUFFER, model->VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(struct Vertex) * model->vertexCount, &model->verticies[0], GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint) * model->indiceCount, model->indices, GL_STATIC_DRAW);
-
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex), (void*)0);
 	glEnableVertexAttribArray(0);
+
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex), (void*)offsetof(struct Vertex, normal));
+	glEnableVertexAttribArray(1);
+
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(struct Vertex), (void*)offsetof(struct Vertex, texture));
+	glEnableVertexAttribArray(2);
 }
 
-void generateCube(struct Model *model, float scale) {
-	model->vertexCount = 8;
-	model->indiceCount = 36;
 
-	model->verticies = generateCubeVerticies(scale);
-	model->indices = generateCubeIndices();
-}
+
 
 struct Vertex *generateCubeVerticies(float scale) {
 	struct Vertex *verticies;
@@ -265,7 +219,7 @@ struct Vertex *generateCubeVerticies(float scale) {
 	return verticies;
 }
 
-uint *generateCubeIndices(void) {
+uint *generateCubeIndices() {
 	uint *indices;
 	indices = malloc(sizeof(uint) * 36);
 	
@@ -292,11 +246,12 @@ uint *generateCubeIndices(void) {
 	return indices;
 }
 
-void generateSphere(struct Model *model, int verticalSlices, int horizontalSlices) {
-	model->vertexCount = verticalSlices * (horizontalSlices - 1) + 2;
-	model->verticies = malloc(sizeof(struct Vertex) * model->vertexCount);
 
-	glm_vec3_copy((vec3){0.0, 1.0, 0.0}, model->verticies[0].position);
+struct Vertex *generateSphereVerticies(int verticalSlices, int horizontalSlices) {
+	uint vertexCount = verticalSlices * (horizontalSlices - 1) + 2;
+	struct Vertex *verticies = malloc(sizeof(struct Vertex) * vertexCount);
+
+	glm_vec3_copy((vec3){0.0, 1.0, 0.0}, verticies[0].position);
 
 	uint m = 1;
 	for (uint h = 0; h < horizontalSlices - 1; h++) {
@@ -305,36 +260,41 @@ void generateSphere(struct Model *model, int verticalSlices, int horizontalSlice
 		for (uint v = 0; v < verticalSlices; v++) {
 			float theta = v * (2.0 * M_PI / verticalSlices);
 
-			glm_vec3_copy((vec3){sin(phi) * cos(theta), cos(phi), sin(phi) * sin(theta)}, model->verticies[m].position);
+			glm_vec3_copy((vec3){sin(phi) * cos(theta), cos(phi), sin(phi) * sin(theta)}, verticies[m].position);
 			m++;
 		}
 	}
 
-	glm_vec3_copy((vec3){0.0, -1.0, 0.0}, model->verticies[m].position);
+	glm_vec3_copy((vec3){0.0, -1.0, 0.0}, verticies[m].position);
 
-	model->indiceCount = verticalSlices * (horizontalSlices - 1) * 6 + 3;
-	model->indices = malloc(sizeof(uint) * model->indiceCount);
+	return verticies;
+}
+
+uint *generateSphereIndices(int verticalSlices, int horizontalSlices) {
+	uint vertexCount = verticalSlices * (horizontalSlices - 1) + 2;
+	uint indiceCount = verticalSlices * (horizontalSlices - 1) * 6 + 3;
+	uint *indices = malloc(sizeof(uint) * indiceCount);
 
 	uint x = 1;
 	uint y = x + horizontalSlices;
-	m = 0;
+	uint m = 0;
 
 	// Add the last, first layer triangle
 	// TODO; FIX THIS AWFUL CODE
-	model->indices[m++] = 1;
-	model->indices[m++] = verticalSlices;
-	model->indices[m++] = y;
+	indices[m++] = 1;
+	indices[m++] = verticalSlices;
+	indices[m++] = y;
 
 	for (uint i = 1; i < (horizontalSlices - 1); i++) {
 		for (uint j = 0; j < verticalSlices; j++) {
 			y = x + horizontalSlices;
-			model->indices[m++] = x;
-			model->indices[m++] = x + 1;
-			model->indices[m++] = y;
+			indices[m++] = x;
+			indices[m++] = x + 1;
+			indices[m++] = y;
 
-			model->indices[m++] = x + 1;
-			model->indices[m++] = y;
-			model->indices[m++] = y + 1;
+			indices[m++] = x + 1;
+			indices[m++] = y;
+			indices[m++] = y + 1;
 			x++;
 		}
 	}
@@ -342,28 +302,30 @@ void generateSphere(struct Model *model, int verticalSlices, int horizontalSlice
 	// Add top triangles
 	x = 1;
 	for (uint i = 0; i < verticalSlices - 1; i++) {
-		model->indices[m++] = 0;
-		model->indices[m++] = x;
-		model->indices[m++] = x + 1;
+		indices[m++] = 0;
+		indices[m++] = x;
+		indices[m++] = x + 1;
 		x++;
 	}
 
-	model->indices[m++] = 0;
-	model->indices[m++] = 1;
-	model->indices[m++] = x;
+	indices[m++] = 0;
+	indices[m++] = 1;
+	indices[m++] = x;
 
 	// Add bottom triangles
-	x = model->vertexCount - 2;
+	x = vertexCount - 2;
 	for (uint i = 0; i < verticalSlices - 1; i++) {
-		model->indices[m++] = model->vertexCount - 1;
-		model->indices[m++] = x;
-		model->indices[m++] = x - 1;
+		indices[m++] = vertexCount - 1;
+		indices[m++] = x;
+		indices[m++] = x - 1;
 		x--;
 	}
 
-	model->indices[m++] = model->vertexCount - 1;
-	model->indices[m++] = model->vertexCount - 2;
-	model->indices[m++] = x;
+	indices[m++] = vertexCount - 1;
+	indices[m++] = vertexCount - 2;
+	indices[m++] = x;
+
+	return indices;
 }
 
 void floatToVec3(float a, vec3 dest) {
@@ -372,146 +334,65 @@ void floatToVec3(float a, vec3 dest) {
 
 // CONTROLS_C
 
-void processKeyInput(struct Window *window, struct Camera *camera) {
-	GLFWwindow *frame = window->frame;
 
-	if(isKeyPressed(frame, GLFW_KEY_ESCAPE))
-		glfwSetWindowShouldClose(frame, 1);
-
-	if(isKeyPressed(frame, GLFW_KEY_TAB) && window->tabDelay < glfwGetTime())
-		toggleCursorMode(window);
-
-	float moveSpeed = 5.0 * window->deltaTime;
-	float turnSpeed = 75.0 * window->deltaTime;
-	float zoomSpeed = 50.0 * window->deltaTime;
-
-	if(isKeyPressed(frame, GLFW_KEY_LEFT_SHIFT))
-		moveSpeed *= 5.0;
-
-	if(isKeyPressed(frame, GLFW_KEY_W))
-		cameraMoveZ(camera,  moveSpeed);
-	if(isKeyPressed(frame, GLFW_KEY_S))
-		cameraMoveZ(camera, -moveSpeed);
-	if(isKeyPressed(frame, GLFW_KEY_A))
-		cameraMoveX(camera,  moveSpeed);
-	if(isKeyPressed(frame, GLFW_KEY_D))
-		cameraMoveX(camera, -moveSpeed);
-	if(isKeyPressed(frame, GLFW_KEY_E))
-		cameraMoveY(camera,  moveSpeed);
-	if(isKeyPressed(frame, GLFW_KEY_Q))
-		cameraMoveY(camera, -moveSpeed);
-
-	if(isKeyPressed(frame, GLFW_KEY_RIGHT))
-		cameraTurnYaw(camera,  turnSpeed);
-	if(isKeyPressed(frame, GLFW_KEY_LEFT))
-		cameraTurnYaw(camera, -turnSpeed);
-	if(isKeyPressed(frame, GLFW_KEY_UP))
-		cameraTurnPitch(camera,  turnSpeed);
-	if(isKeyPressed(frame, GLFW_KEY_DOWN))
-		cameraTurnPitch(camera, -turnSpeed);
-	if(isKeyPressed(frame, GLFW_KEY_C))
-		cameraZoom(camera,  zoomSpeed);
-	if(isKeyPressed(frame, GLFW_KEY_Z))
-		cameraZoom(camera, -zoomSpeed);
-}
-
-void toggleCursorMode(struct Window *window) {
-	window->tabDelay = glfwGetTime() + 0.1;
-	glfwSetInputMode(window->frame, GLFW_CURSOR,
-		glfwGetInputMode(window->frame, GLFW_CURSOR) == GLFW_CURSOR_DISABLED?
-		GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED
-	);
-
-	if (glfwGetInputMode(window->frame, GLFW_CURSOR) == GLFW_CURSOR_NORMAL)
-		return;
-
-	struct WindowUserPointer *windowPtr = glfwGetWindowUserPointer(window->frame);
-	windowPtr->mouse->firstMouse = true;
-}
-
-void initMouse(struct Mouse *mouse, const float sensitivity) {
-	mouse->firstMouse = true;
-	mouse->sensitivity = sensitivity;
-}
 
 // CAMERA_C
 
-void cameraMoveX(struct Camera *camera, float moveSpeed) {
+void cameraMoveX(vec3 up, vec3 front, vec3 right, vec3 position, float moveSpeed) {
 	vec3 move;
-	glm_vec3_cross(camera->up, camera->front, camera->right);
-	glm_normalize(camera->right);
-	glm_vec3_scale(camera->right, moveSpeed, move);
-	glm_vec3_add(camera->position, move, camera->position);
+	glm_vec3_cross(up, front, right);
+	glm_normalize(right);
+	glm_vec3_scale(right, moveSpeed, move);
+	glm_vec3_add(position, move, position);
 }
 
-void cameraMoveY(struct Camera *camera, float moveSpeed) {
+void cameraMoveY(vec3 up, vec3 front, vec3 right, vec3 position, float moveSpeed) {
 	vec3 move;
-	glm_vec3_scale(camera->up, moveSpeed, move);
-	glm_vec3_add(camera->position, move, camera->position);
+	glm_vec3_scale(up, moveSpeed, move);
+	glm_vec3_add(position, move, position);
 }
 
-void cameraMoveZ(struct Camera *camera, float moveSpeed) {
+void cameraMoveZ(vec3 up, vec3 front, vec3 right, vec3 position, float moveSpeed) {
 	vec3 move;
-	glm_vec3_scale(camera->front, moveSpeed, move);
-	glm_vec3_add(camera->position, move, camera->position);
+	glm_vec3_scale(front, moveSpeed, move);
+	glm_vec3_add(position, move, position);
 }
 
-void cameraTurnYaw(struct Camera *camera, float turnSpeed) {
-	camera->yaw += turnSpeed;
+void cameraTurnYaw(vec3 front, float *yaw, float *pitch, float *roll, float turnSpeed) {
+	*yaw += turnSpeed;
 
 	glm_vec3_copy((vec3){
-		cos(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch)),
-		sin(glm_rad(camera->pitch)),
-		sin(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch)),
-	}, camera->front);
+		cos(glm_rad(*yaw)) * cos(glm_rad(*pitch)),
+		sin(glm_rad(*pitch)),
+		sin(glm_rad(*yaw)) * cos(glm_rad(*pitch)),
+	}, front);
 
-	glm_normalize(camera->front);
+	glm_normalize(front);
 }
 
-void cameraTurnPitch(struct Camera *camera, float turnSpeed) {
-	if (camera->pitch + turnSpeed >= 90.0 || camera->pitch + turnSpeed <= -90.0)
+void cameraTurnPitch(vec3 front, float *yaw, float *pitch, float *roll, float turnSpeed) {
+	if (*pitch + turnSpeed >= 90.0 || *pitch + turnSpeed <= -90.0)
 		return;
 
-	camera->pitch += turnSpeed;
+	*pitch += turnSpeed;
 
 	glm_vec3_copy((vec3){
-		cos(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch)),
-		sin(glm_rad(camera->pitch)),
-		sin(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch)),
-	}, camera->front);
+		cos(glm_rad(*yaw)) * cos(glm_rad(*pitch)),
+		sin(glm_rad(*pitch)),
+		sin(glm_rad(*yaw)) * cos(glm_rad(*pitch)),
+	}, front);
 
-	glm_normalize(camera->front);
+	glm_normalize(front);
 }
 
-void cameraTurnRoll(struct Camera *camera, float turnSpeed) {
+void cameraTurnRoll(vec3 front, float yaw, float pitch, float roll, float turnSpeed) {
 
 }
 
-void cameraZoom(struct Camera *camera, float zoomSpeed) {
-	if (camera->fov - zoomSpeed >= 180 || camera->fov - zoomSpeed <= 0)
+void cameraZoom(float fov, float zoomSpeed) {
+	if (fov - zoomSpeed >= 180 || fov - zoomSpeed <= 0)
 		return;
 
-	camera->fov -= zoomSpeed;
+	fov -= zoomSpeed;
 }
 
-void initCamera(struct Camera *camera, vec3 position, float yaw, float pitch, float fov, float nearPlane, float farPlane) {
-	glm_vec3_copy(position, camera->position);
-	glm_vec3_copy((vec3){0.0, 1.0, 0.0}, camera->up);
-
-	camera->yaw = yaw;
-	camera->pitch = pitch;
-	camera->roll = 0.0;
-
-	camera->fov = fov;
-
-	camera->nearPlane = 0.1;
-	camera->farPlane = 1000.0;
-
-	glm_vec3_copy((vec3){
-		cos(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch)),
-		sin(glm_rad(camera->pitch)),
-		sin(glm_rad(camera->yaw)) * cos(glm_rad(camera->pitch)),
-	}, camera->front);
-
-	glm_normalize(camera->front);
-}
