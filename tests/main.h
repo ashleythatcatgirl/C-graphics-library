@@ -5,6 +5,29 @@
 
 #include "stdlib.h"
 
+struct WindowUserPointer {
+	struct Camera *camera;
+	struct Mouse *mouse;
+};
+
+struct Window {
+	GLFWwindow *frame;
+	float width;
+	float height;
+	const char *name;
+
+	struct WindowUserPointer userPtr;
+
+	double currentFrame;
+	double lastFrame;
+	double deltaTime;
+
+	float targetFps;
+	float targetFrameLength;
+
+	float tabDelay;
+};
+
 struct Instance {
 	vec3 position;
 	vec3 rotation;
@@ -66,6 +89,8 @@ struct Camera {
 	float nearPlane;
 	float farPlane;
 };
+
+void initWindow(struct Window *window, const int width, const int height, const char *name, const float fps);
 
 void generateCube(struct Model *model, float scale);
 void generateSphere(struct Model *model, int verticalSlices, int horizontalSlices);

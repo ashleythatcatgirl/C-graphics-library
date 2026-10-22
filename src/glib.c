@@ -12,16 +12,6 @@
 
 // WINDOW_C
 
-void initWindow(struct Window *window, const int width, const int height, const char *name, const float fps) {
-	window->width = width;
-	window->height = height;
-	window->name = name;
-	window->targetFps = fps;
-	window->targetFrameLength = 1.0 / fps;
-
-	window->frame = createWindow(window->width, window->height, window->name, (void*)&window->userPtr);
-}
-
 GLFWwindow *createWindow(const int width, const int height, const char *name, void *userPointer) {
 	glfwInit();
 	glfwWindowHint(GLFW_SAMPLES, 4);
@@ -73,7 +63,8 @@ void loadShader(const uint shaderProgram, const char *shaderPath, const int shad
 	int success;
 
 	const char *shaderContent = getShaderContent(shaderPath);
-	if (!shaderContent) return;
+	if (!shaderContent)
+		return;
 
 	shader = glCreateShader(shaderType);
 	glShaderSource(shader, 1, &shaderContent, NULL);
@@ -251,6 +242,7 @@ struct Vertex *generateSphereVerticies(int verticalSlices, int horizontalSlices)
 	uint vertexCount = verticalSlices * (horizontalSlices - 1) + 2;
 	struct Vertex *verticies = malloc(sizeof(struct Vertex) * vertexCount);
 
+	// Top vertex
 	glm_vec3_copy((vec3){0.0, 1.0, 0.0}, verticies[0].position);
 
 	uint m = 1;
@@ -265,6 +257,7 @@ struct Vertex *generateSphereVerticies(int verticalSlices, int horizontalSlices)
 		}
 	}
 
+	// Bottom vertex
 	glm_vec3_copy((vec3){0.0, -1.0, 0.0}, verticies[m].position);
 
 	return verticies;
@@ -279,8 +272,9 @@ uint *generateSphereIndices(int verticalSlices, int horizontalSlices) {
 	uint y = x + horizontalSlices;
 	uint m = 0;
 
+	// TODO: FIX THIS AWFUL CODE
+	
 	// Add the last, first layer triangle
-	// TODO; FIX THIS AWFUL CODE
 	indices[m++] = 1;
 	indices[m++] = verticalSlices;
 	indices[m++] = y;
@@ -361,13 +355,7 @@ void cameraMoveZ(vec3 up, vec3 front, vec3 right, vec3 position, float moveSpeed
 void cameraTurnYaw(vec3 front, float *yaw, float *pitch, float *roll, float turnSpeed) {
 	*yaw += turnSpeed;
 
-	glm_vec3_copy((vec3){
-		cos(glm_rad(*yaw)) * cos(glm_rad(*pitch)),
-		sin(glm_rad(*pitch)),
-		sin(glm_rad(*yaw)) * cos(glm_rad(*pitch)),
-	}, front);
-
-	glm_normalize(front);
+	updateCameraFront(front, *yaw, *pitch, *roll);
 }
 
 void cameraTurnPitch(vec3 front, float *yaw, float *pitch, float *roll, float turnSpeed) {
@@ -376,23 +364,27 @@ void cameraTurnPitch(vec3 front, float *yaw, float *pitch, float *roll, float tu
 
 	*pitch += turnSpeed;
 
+	updateCameraFront(front, *yaw, *pitch, *roll);
+}
+
+void cameraTurnRoll(vec3 front, float *yaw, float *pitch, float *roll, float turnSpeed) {
+
+}
+
+void updateCameraFront(vec3 front, float yaw, float pitch, float roll) {
 	glm_vec3_copy((vec3){
-		cos(glm_rad(*yaw)) * cos(glm_rad(*pitch)),
-		sin(glm_rad(*pitch)),
-		sin(glm_rad(*yaw)) * cos(glm_rad(*pitch)),
+		cos(glm_rad(yaw)) * cos(glm_rad(pitch)),
+		sin(glm_rad(pitch)),
+		sin(glm_rad(yaw)) * cos(glm_rad(pitch)),
 	}, front);
 
 	glm_normalize(front);
 }
 
-void cameraTurnRoll(vec3 front, float yaw, float pitch, float roll, float turnSpeed) {
-
-}
-
-void cameraZoom(float fov, float zoomSpeed) {
-	if (fov - zoomSpeed >= 180 || fov - zoomSpeed <= 0)
+void cameraZoom(float *fov, float zoomSpeed) {
+	if (*fov - zoomSpeed >= 180 || *fov - zoomSpeed <= 0)
 		return;
 
-	fov -= zoomSpeed;
+	*fov -= zoomSpeed;
 }
 

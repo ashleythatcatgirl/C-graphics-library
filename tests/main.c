@@ -21,10 +21,10 @@ int main()  {
 	generateSphere(&scene.models[1], 25, 25);
 	generateSphere(&scene.models[2], 50, 50);
 	generateSphere(&scene.models[3], 100, 100);
-	initModel(&scene.models[0], 1);
-	initModel(&scene.models[1], 1);
-	initModel(&scene.models[2], 1);
-	initModel(&scene.models[3], 1);
+
+
+	for (uint i = 0; i < 4; i++) 
+		initModel(&scene.models[i], 1);
 
 	for (uint i = 0; i < 4; i++) 
 		scene.models[i].shader = createShaderProgram("./shaders/vertex.glsl", NULL, "./shaders/fragment.glsl");
@@ -64,6 +64,18 @@ int main()  {
 	glfwTerminate();
 
 	return 0;
+}
+
+// Window
+
+void initWindow(struct Window *window, const int width, const int height, const char *name, const float fps) {
+	window->width = width;
+	window->height = height;
+	window->name = name;
+	window->targetFps = fps;
+	window->targetFrameLength = 1.0 / fps;
+
+	window->frame = createWindow(window->width, window->height, window->name, (void*)&window->userPtr);
 }
 
 // Model
@@ -191,9 +203,9 @@ void processKeyInput(struct Window *window, struct Camera *camera) {
 	if(isKeyPressed(frame, GLFW_KEY_DOWN))
 		cameraTurnPitch(camera->front, &camera->yaw, &camera->pitch, &camera->roll, -turnSpeed);
 	if(isKeyPressed(frame, GLFW_KEY_C))
-		cameraZoom(camera->fov,  zoomSpeed);
+		cameraZoom(&camera->fov,  zoomSpeed);
 	if(isKeyPressed(frame, GLFW_KEY_Z))
-		cameraZoom(camera->fov, -zoomSpeed);
+		cameraZoom(&camera->fov, -zoomSpeed);
 }
 void toggleCursorMode(struct Window *window) {
 	window->tabDelay = glfwGetTime() + 0.1;
@@ -271,7 +283,7 @@ void scroll_callback(GLFWwindow *frame, double xOffset, double yOffset) {
 	struct WindowUserPointer *windowPtr = glfwGetWindowUserPointer(frame);
 	struct Camera *camera = windowPtr->camera;
 
-	cameraZoom(camera->fov, 2 * yOffset);
+	cameraZoom(&camera->fov, 2 * yOffset);
 }
 
 

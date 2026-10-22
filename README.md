@@ -59,3 +59,5 @@ gcc -lGLib
 ## Documentation
 
 TBA
+
+For now, look at `tests/` to see an example program

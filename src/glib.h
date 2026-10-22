@@ -12,30 +12,6 @@
 #ifndef WINDOW_H
 #define WINDOW_H
 
-struct WindowUserPointer {
-	struct Camera *camera;
-	struct Mouse *mouse;
-};
-
-struct Window {
-	GLFWwindow *frame;
-	float width;
-	float height;
-	const char *name;
-
-	struct WindowUserPointer userPtr;
-
-	double currentFrame;
-	double lastFrame;
-	double deltaTime;
-
-	float targetFps;
-	float targetFrameLength;
-
-	float tabDelay;
-};
-
-void initWindow(struct Window *window, const int width, const int height, const char *name, const float fps);
 GLFWwindow *createWindow(const int height, const int width, const char *name, void *userPointer);
 
 void framebuffer_size_callback(GLFWwindow *frame, int width, int height);
@@ -139,8 +115,9 @@ void cameraMoveY(vec3 up, vec3 front, vec3 right, vec3 position, float moveSpeed
 void cameraMoveZ(vec3 up, vec3 front, vec3 right, vec3 position, float moveSpeed);
 void cameraTurnYaw(vec3 front, float *yaw, float *pitch, float *roll, float turnSpeed);
 void cameraTurnPitch(vec3 front, float *yaw, float *pitch, float *roll, float turnSpeed);
-void cameraTurnRoll(vec3 front, float yaw, float pitch, float roll, float turnSpeed);
-void cameraZoom(float fov, float zoomSpeed);
+void cameraTurnRoll(vec3 front, float *yaw, float *pitch, float *roll, float turnSpeed);
+void updateCameraFront(vec3 front, float yaw, float pitch, float roll);
+void cameraZoom(float *fov, float zoomSpeed);
 
 #endif // CAMERA_H
 
